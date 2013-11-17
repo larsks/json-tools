@@ -1,0 +1,63 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import argparse
+
+import json
+
+def parse_args():
+    p = argparse.ArgumentParser()
+    p.add_argument('--keys', '-k', action='store_true')
+    p.add_argument('--pretty', '-p', action='store_true')
+    p.add_argument('paths', nargs='*')
+    return p.parse_args()
+
+def process_paths(cfg, paths):
+    if not paths:
+        yield cfg
+    else:
+        for path in paths:
+            parts = path.split('.')
+            here = cfg
+            while len(parts) > 1:
+                k = parts[0]
+                try:
+                    here = here[k]
+                except TypeError:
+                    if k.isdigit():
+                        here = here[int(k)]
+                    else:
+                        raise
+
+                parts = parts[1:]
+
+            k = parts[0]
+            try:
+                yield(here[k])
+            except TypeError:
+                if k.isdigit():
+                    yield(here[int(k)])
+                else:
+                    raise
+
+def main():
+    args = parse_args()
+
+    cfg = json.load(sys.stdin)
+
+    for path in process_paths(cfg, args.paths):
+        if args.keys:
+            if isinstance(path, dict):
+                print path.keys()
+            elif isinstance(path, list):
+                print '0:%d' % (len(path)-1)
+        elif args.pretty:
+            print json.dumps(path, indent=4)
+        else:
+            print path
+
+if __name__ == '__main__':
+    main()
+
+

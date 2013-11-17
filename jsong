@@ -1,0 +1,72 @@
+#!/usr/bin/python
+
+import os
+import sys
+import argparse
+
+import json
+
+class Configdict (dict):
+
+    def __getitem__ (self, k):
+        try:
+            return super(Configdict, self).__getitem__(k)
+        except KeyError:
+            self[k] = Configdict()
+            return self[k]
+
+class Configlist (list):
+    def grow(self, i):
+        if i > (len(self) - 1):
+            self.extend([None] * (i - len(self) + 1))
+
+    def __setitem__(self, i, v):
+        i = int(i)
+        self.grow(i)
+        return super(Configlist, self).__setitem__(i,v)
+
+    def __getitem__ (self, i):
+        i = int(i)
+
+        self.grow(i)
+        v = super(Configlist, self).__getitem__(i)
+
+        if v is None:
+            self[i] = Configdict()
+            v = self[i]
+
+        return v
+
+def parse_args():
+    p = argparse.ArgumentParser()
+    p.add_argument('vars', nargs='*')
+    return p.parse_args()
+
+def main():
+    args = parse_args()
+
+    cfg = Configdict()
+
+    for var in args.vars:
+        path,val = var.split('=', 1)
+        parts = path.split('.')
+        here = cfg
+        while len(parts) > 1:
+            here = here[parts[0]]
+            parts = parts[1:]
+
+        k = parts[0]
+        if k.isdigit():
+            k = int(k)
+
+        if val == '[]':
+            here[k] = Configlist()
+        else:
+            here[k] = val
+
+    print json.dumps(cfg, indent=4)
+
+if __name__ == '__main__':
+    main()
+
+
