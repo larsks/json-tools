@@ -30,7 +30,7 @@ You get:
         }
     }
 
-You can also generate data with lists by initialing a path to the
+You can also generate data with lists by initializing a path to the
 special value `[]`.  For example:
 
     $ jsong service/type=example \
