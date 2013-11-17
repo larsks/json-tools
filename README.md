@@ -110,3 +110,73 @@ You can use `-p` to pretty-print the output:
         }
     }
 
+## Examples
+
+### Authenticate to Keystone and getting an acess token
+
+    #!/bin/sh
+
+    # pass the ip address or hostname of your keystone server
+    # on the command line.
+    keystone_url=http://$1:5000/v2.0
+
+    token=$(
+      jsong auth/passwordCredentials/username=admin \
+        auth/passwordCredentials/password=secret \
+        auth/tenantName=admin |
+      curl -s -H 'content-type: application/json' \
+        --data-binary @- ${keystone_url}/tokens |
+      jsonx -v access/token/id
+    )
+
+    echo "got token: $token"
+
+### Get a list of subnets from Quantum
+
+For each network available in Quantum, this will print the network
+name and a list of subnet ids and their corresponding cidr range.
+
+    #!/bin/sh
+
+    # pass the ip address or hostname of your keystone server
+    # on the command line.
+    keystone_url=http://$1:5000/v2.0
+
+    work=$(mktemp -d jsonXXXXXX)
+    trap "rm -rf $work" EXIT
+
+    jsong auth/passwordCredentials/username=admin \
+      auth/passwordCredentials/password=secret \
+      auth/tenantName=admin |
+    curl -s -H 'content-type: application/json' \
+      --data-binary @- ${keystone_url}/tokens > $work/token.json
+
+    token=$(jsonx -v access/token/id < $work/token.json)
+
+    network_path=$(
+      jsonx access/serviceCatalog/*/type < $work/token.json | 
+      awk '$2 == "network" {print $1}'
+      )
+
+    network_url=$(
+      jsonx -v ${network_path%/type}/endpoints/0/publicURL < $work/token.json
+      )
+
+    curl -s \
+      -H 'content-type: application/json' \
+      -H "x-auth-token: $token" \
+      $network_url/v2.0/networks > $work/networks.json
+
+    for network in $(jsonx -k networks/* < $work/networks.json); do
+      jsonx -v $network/name < $work/networks.json
+
+      for subnet in $(jsonx -v ${network}/subnets/* < $work/networks.json); do
+        curl -s \
+          -H 'content-type: application/json' \
+          -H "x-auth-token: $token" \
+          $network_url/v2.0/subnets/$subnet > $work/subnet-$subnet.json
+
+        echo "  $subnet $(jsonx -v subnet/cidr < $work/subnet-$subnet.json)"
+      done
+    done
+
